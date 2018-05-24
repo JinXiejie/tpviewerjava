@@ -1,0 +1,105 @@
+/**
+ * Copyright (C) 2011 Guangzhou JHComn Technologies Ltd.
+ *
+ * 本代码版权归广州佳和立创科技发展有限公司所有，且受到相关的法律保护。
+ * 没有经过版权所有者的书面同意，
+ * 任何其他个人或组织均不得以任何形式将本文件或本文件的部分代码用于其他商业用途。
+ *
+ */
+package com.mip.tp.parser;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+import com.mip.tp.data.ViewObject;
+import com.mip.tp.data.partdischarge.PDViewObject;
+import com.mip.tp.factory.ImageGeneratorFactory;
+import com.mip.tp.factory.ParserFactory;
+import com.mip.tp.factory.TPType;
+import com.mip.tp.image.ImageGenerator;
+import com.mip.tp.image.ImageGeneratorException;
+
+/**
+ * http://tech.ccidnet.com/art/3739/20051117/521859_1.html
+ * @author longyz
+ * @date 2012-4-19
+ */
+public class Main {
+
+	private static final String SAVEIMAGEPATH = "D:/a_new.png";
+	/**
+	 * @param args
+	 * @throws IOException 
+	 * @throws ImageGeneratorException 
+	 */
+	public static void main(String[] args) throws IOException, ImageGeneratorException {
+		long start = System.currentTimeMillis();
+//		testCBParser();
+//		testGasWaterParser();
+//		testPDPrpsParser();
+		//testDMSPrpsParser();
+//		testPDPrpdParser();
+		testNewDMSPrpsParser();
+		System.out.println("用时:" + (System.currentTimeMillis() - start));
+	}
+	
+	public static void testCBParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.CB;
+		IParser parser = ParserFactory.getParser(type);
+//		InputStream data = Main.class.getResourceAsStream("/datafiles/close_ciWave.dat");//合闸
+//		InputStream data = Main.class.getResourceAsStream("/datafiles/open_ciWave.dat");//开闸
+		InputStream data = Main.class.getResourceAsStream("/datafiles/cb/EDS1-CB15-SCBR1_02_20120627084323.dat");//开闸
+		ViewObject vo =parser.parser(data);
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+	public static void testGasWaterParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.GASWATER;
+		IParser parser = ParserFactory.getParser(type);
+		InputStream data = Main.class.getResourceAsStream("/datafiles/0301B15000003A2982000_105_07_20110510100145.dat");
+		ViewObject vo =parser.parser(data);
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+	public static void testPDPrpsParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.PD;
+		IParser parser = ParserFactory.getParser(type);
+		InputStream data = Main.class.getResourceAsStream("/datafiles/pd_floating.dat");
+//		InputStream data = Main.class.getResourceAsStream("/datafiles/cb/EDS1-PD05-SPDC3_01_20120625081426.dat");
+		ViewObject vo =parser.parser(data);
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+	
+	public static void testDMSPrpsParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.PD;
+		IParser parser = ParserFactory.getParser(type);
+		InputStream data = Main.class.getResourceAsStream("/datafiles/pdm/0001__001_01__20121101081434.dat");
+		ViewObject vo =parser.parser(data);
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+	
+	public static void testNewDMSPrpsParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.NPD;
+		IParser parser = ParserFactory.getParser(type);
+		InputStream data = Main.class.getResourceAsStream("/datafiles/pdm/0301B13000005A3830616_004_01_20140817143145.dat");
+		//	InputStream data = Main.class.getResourceAsStream("/datafiles/pdm/0301B13000005A3830600_004_01_20140801235959.dat");//临时文件
+		ViewObject vo =parser.parser(data);
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+	
+	public static void testPDPrpdParser() throws IOException, ImageGeneratorException{
+		TPType type = TPType.PD;
+		IParser parser = ParserFactory.getParser(type);
+//		InputStream data = Main.class.getResourceAsStream("/datafiles/pd_floating.dat");
+		InputStream data = Main.class.getResourceAsStream("/datafiles/cb/EDS1-PD05-SPDC3_01_20120625081426.dat");
+		ViewObject vo =parser.parser(data);
+		PDViewObject pdvo = (PDViewObject)vo;
+		pdvo.tptype = 0;
+		ImageGenerator generator = ImageGeneratorFactory.getImageGenerator(type);
+		generator.generate(vo,SAVEIMAGEPATH);
+	}
+
+}

@@ -1,0 +1,193 @@
+/**
+ * Copyright (C) 2011 Guangzhou JHComn Technologies Ltd.
+ *
+ * 本代码版权归广州佳和立创科技发展有限公司所有，且受到相关的法律保护。
+ * 没有经过版权所有者的书面同意，
+ * 任何其他个人或组织均不得以任何形式将本文件或本文件的部分代码用于其他商业用途。
+ *
+ */
+package com.mip.tp.parser.impl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import org.apache.commons.io.input.SwappedDataInputStream;
+
+import com.mip.tp.data.ViewObject;
+import com.mip.tp.data.partdischarge.PDViewObject;
+import com.mip.tp.factory.TPType;
+import com.mip.tp.parser.IParser;
+import com.mip.tp.util.ParserUtil;
+
+/**
+ * 
+ * @author huanghf
+ * @date 2014-08-22
+ * 参考 《在线监测装置谱图数据通用格式规范V1.2 (1).pdf》
+ */
+public class NewDMSPDParser implements IParser {
+
+	/* (non-Javadoc)
+	 * @see com.mip.tp.parser.IParser#parser(java.lang.Object)
+	 */
+	@Override
+	public ViewObject parser(InputStream is) throws IOException {
+		SwappedDataInputStream stream = new SwappedDataInputStream(is);
+		PDViewObject vo = new PDViewObject();
+		vo.version = stream.readFloat();//规范版本号
+		float fileVersion = stream.readFloat();//文件版本号
+		short type = stream.readShort();//谱图类型编码
+		vo.datetime = readLongDate(stream);//谱图生成时间
+		String fileMark = readString(stream, 1);//测试文件标志位,0表示测试用的临时文件，1表示图谱文件
+		System.out.println("测试文件标志位:" + fileMark);
+		if(fileMark.equals("0")){
+			//测试临时文件
+			System.out.println("该文件为测试用的临时文件,不解析");
+			return vo;
+		}
+		System.out.println("通道名称" + readString(stream, 32));//通道名称
+		vo.type = Integer.parseInt(readString(stream, 1));//放电类型
+		vo.alarm = Integer.parseInt(readString(stream, 1));//报警等级
+		vo.probSt = Integer.parseInt(readString(stream, 1));//放电类型概率统计标志
+		//7 种  放电类型的概率
+		for(int i=0;i<7;i++){
+			vo.probs[i] = stream.readFloat();
+		}
+		vo.phaseNum = stream.readInt();//放电相位窗数
+		vo.avg = stream.readInt();//量化幅值
+		vo.cycNum = stream.readInt();//工频周期数
+		vo.fiftyHZ = stream.readFloat();//50Hz 相关性
+		vo.hundredHZ = stream.readFloat();//100Hz 相关性
+		vo.tptype = Integer.parseInt(readString(stream, 1));//局放谱图类型标志
+		vo.unit = Integer.parseInt(readString(stream, 1));//幅值单位
+		vo.minvalue = (int) stream.readFloat();//放电幅值下限
+		vo.maxvalue = (int) stream.readFloat();//放电幅值上限
+		
+		
+		
+		int maxint = 0;
+		int[][] datas = null;
+		if(vo.tptype == 0){//PRPD型图谱,phaseNum窗数
+			vo.maxXCoordinate = vo.phaseNum;
+			vo.maxYCoordinate = vo.avg;
+			datas = new int[vo.phaseNum][vo.avg];
+			//m×n的二维数组。其中：m为相位窗数，n为幅值量化值，数组值为对应的放电频次。
+			//m对应vo.phaseNum,n对应vo.avg
+			for(int x=0;x<vo.phaseNum;x++){
+				for(int y=0;y<vo.avg;y++){
+					int value = (int)stream.readFloat();
+					if(value!=0){
+						maxint = Math.max(maxint, value);
+						datas[x][y] = value;
+						if(value > vo.maxZCoordinate){
+							vo.maxZCoordinate = value;
+						}
+					}
+				}
+			}
+		}else if(vo.tptype == 1){//PRPS型图谱,phaseNum窗数
+			if(vo.unit==1){
+				vo.maxXCoordinate = vo.phaseNum;
+				vo.maxYCoordinate = vo.cycNum;
+				datas = new int[vo.phaseNum][vo.cycNum];
+				System.out.println("分隔符：" + readString(stream, 4));
+				//m×L的二维数组。其中：m为相位窗数，L为工频周期数，数组值为对应的放电强度。
+				//m对应vo.phaseNum,n对应vo.cycNum
+				for(int x=0;x<vo.cycNum;x++){
+					for(int y=0;y<vo.phaseNum;y++){
+						int value = (int)stream.readFloat();
+						if(value!=0){
+							maxint = Math.max(maxint, value);
+							datas[y][x] = value;
+							if(value > vo.maxZCoordinate){
+								vo.maxZCoordinate = value;
+							}
+						}
+					}
+				}
+			}else if(vo.unit==2){
+//				vo.maxXCoordinate = vo.cycNum;
+//				vo.maxYCoordinate = vo.phaseNum;
+//				datas = new int[vo.cycNum][vo.phaseNum];
+				
+				vo.maxXCoordinate = vo.phaseNum;
+				vo.maxYCoordinate = vo.cycNum;
+				datas = new int[vo.phaseNum][vo.cycNum];
+				for(int x=0;x<vo.cycNum;x++){
+					for(int y=0;y<vo.phaseNum;y++){
+						int value = stream.readShort();
+						if(value != 0){
+							maxint = Math.max(maxint, value);
+							datas[y][x] = value;
+							if(value > vo.maxZCoordinate){
+								vo.maxZCoordinate = value;
+							}
+						}
+					}
+				}
+			}
+			
+		}
+		vo.maxint = maxint;
+		vo.datas = datas;
+		return vo;
+	}
+	
+	public static String readString(SwappedDataInputStream stream ,int byteCount) throws IOException{
+		//StringBuffer sb = new StringBuffer();
+		byte[] bytes = new byte[byteCount];
+		for(int i=0; i<byteCount; i++){
+			//sb.append((char)stream.readByte());
+			bytes[i] = stream.readByte();
+		}
+		String str = new String(bytes);
+		return str.trim();
+	}
+	
+	private static SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private static String readDate(SwappedDataInputStream stream) throws IOException{
+        int t=stream.readInt();
+        long ltime=((long)(t-(8*60*60)))*1000l;
+        return df.format(new Date(ltime));
+	}
+	
+	private static String readLongDate(SwappedDataInputStream stream) throws IOException{
+        long t=stream.readLong();
+        SimpleDateFormat df1 = new SimpleDateFormat("yyyyMMddHHmmss");
+        Date d = null;
+		try {
+			d = (Date) df1.parse("" + t);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+        return df.format(d);
+	}
+	
+	private static String readAddress(SwappedDataInputStream stream) throws IOException{
+		StringBuffer addr = new StringBuffer();
+		
+		for(int i=0;i<4;i++){
+			int b = (int)stream.readByte();
+			if(b < 0){
+				b += 256;
+			}
+			addr.append(b);
+			if(i < 3){
+				addr.append(".");
+			}
+		}
+		return addr.toString();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.mip.tp.parser.IParser#getType()
+	 */
+	@Override
+	public TPType getType() {
+		return TPType.PD;
+	}
+
+}
